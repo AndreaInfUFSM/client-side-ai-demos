@@ -16,6 +16,13 @@ const statusText = document.getElementById('statusText');
 const statusDot = document.getElementById('statusDot');
 const overlay = document.getElementById('overlay');
 
+const consentModal = document.getElementById('consentModal');
+const acceptConsentBtn = document.getElementById('acceptConsentBtn');
+const declineConsentBtn = document.getElementById('declineConsentBtn');
+const progressModal = document.getElementById('progressModal');
+const progressModalText = document.getElementById('progressModalText');
+
+
 let currentImageDataUrl = null;
 let workerReady = false;
 let modelReady = false;
@@ -23,6 +30,12 @@ let modelReady = false;
 let currentRun = {
   analyzeStartedAt: null,
   modelInfo: null
+};
+
+const state = {
+  hasConsent: false,
+  hasCompletedDefaultRun: false,
+  currentSource: null
 };
 
 const runner = createEfficientDetLite0Runner({
@@ -75,8 +88,12 @@ function clearImage() {
 }
 
 function refreshButtons() {
-  analyzeBtn.disabled = !(workerReady && modelReady && currentImageDataUrl);
+  refreshSourceControls();
 }
+
+// function refreshButtons() {
+//   analyzeBtn.disabled = !(workerReady && modelReady && currentImageDataUrl);
+// }
 
 function safeParseConfig() {
   return JSON.parse(configInput.value);
@@ -155,6 +172,41 @@ function drawDetectionsOnPreview(detections) {
   }
 }
 
+function openProgressModal(text) {
+  progressModalText.textContent = text;
+  if (!progressModal.open) progressModal.showModal();
+}
+
+function updateProgressModal(text) {
+  progressModalText.textContent = text;
+}
+
+function closeProgressModal() {
+  if (progressModal.open) progressModal.close();
+}
+
+function disableAllInputs() {
+  imageInput.disabled = true;
+  useDefaultBtn.disabled = true;
+  loadBtn.disabled = true;
+  analyzeBtn.disabled = true;
+}
+
+function refreshSourceControls() {
+  if (!state.hasConsent) {
+    disableAllInputs();
+    return;
+  }
+
+  useDefaultBtn.disabled = false;
+
+  const unlocked = state.hasCompletedDefaultRun;
+  imageInput.disabled = !unlocked;
+
+  loadBtn.disabled = false;
+  analyzeBtn.disabled = !(workerReady && modelReady && currentImageDataUrl);
+}
+
 async function blobToDataUrl(blob) {
   return await new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -185,6 +237,7 @@ imageInput.addEventListener('change', async (event) => {
   try {
     const dataUrl = await blobToDataUrl(file);
     currentImageDataUrl = dataUrl;
+    state.currentSource = 'file';
     showImage(dataUrl);
     refreshButtons();
   } catch {
@@ -196,6 +249,7 @@ useDefaultBtn.addEventListener('click', async () => {
   try {
     setStatus('Loading default image...', 'busy');
     await loadDefaultImage();
+    state.currentSource = 'default';
     setStatus('Default image loaded.', 'ok');
   } catch (err) {
     setStatus(err.message || 'Could not load default image.', 'err');
@@ -208,9 +262,12 @@ loadBtn.addEventListener('click', async () => {
     modelReady = false;
     outputEl.textContent = '{}';
     refreshButtons();
+    openProgressModal('Loading model...');
     setStatus('Loading model...', 'busy');
     await runner.loadModel(config);
+    closeProgressModal();
   } catch (err) {
+    closeProgressModal();
     setStatus(err.message || 'Invalid JSON config.', 'err');
     refreshButtons();
   }
@@ -231,6 +288,8 @@ analyzeBtn.addEventListener('click', async () => {
 
     currentRun.analyzeStartedAt = performance.now();
     outputEl.textContent = '{}';
+
+    openProgressModal('Analyzing image...');
     setStatus('Analyzing image...', 'busy');
     analyzeBtn.disabled = true;
 
@@ -251,52 +310,72 @@ analyzeBtn.addEventListener('click', async () => {
     const detections = resultPayload.parsed_json?.detections || [];
     drawDetectionsOnPreview(detections);
 
-    try {
-      setStatus('Collecting environment...', 'busy');
-      const environment = await collectEnvironment();
+    updateProgressModal('Collecting environment...');
+    const environment = await collectEnvironment();
 
-      setStatus('Sending result...', 'busy');
+    updateProgressModal('Sending result...');
+    const submission = buildSubmission({
+      project: demoConfig.project,
+      kind: demoConfig.kind,
+      client: demoConfig.client,
+      clientVersion: demoConfig.clientVersion,
+      probeVersion: demoConfig.probeVersion,
+      payload: {
+        identity: environment.identity,
+        hardware: environment.hardware,
+        capabilities: environment.capabilities,
+        media: environment.media,
+        benchmark: {
+          model_id: config.model_id,
+          processor_id: config.processor_id || config.model_id,
+          backend: resultPayload.backend,
+          dtype: resultPayload.dtype,
+          load_ms: currentRun.modelInfo?.load_ms ?? null,
+          inference_ms: resultPayload.inference_ms ?? null,
+          total_analyze_ms: resultPayload.total_analyze_ms
+        },
+        result: {
+          raw_text: resultPayload.raw_text,
+          parsed_json: resultPayload.parsed_json
+        },
+        config
+      }
+    });
 
-      const submission = buildSubmission({
-        project: demoConfig.project,
-        kind: demoConfig.kind,
-        client: demoConfig.client,
-        clientVersion: demoConfig.clientVersion,
-        probeVersion: demoConfig.probeVersion,
-        payload: {
-          identity: environment.identity,
-          hardware: environment.hardware,
-          capabilities: environment.capabilities,
-          media: environment.media,
-          benchmark: {
-            model_id: config.model_id,
-            processor_id: config.processor_id || config.model_id,
-            backend: resultPayload.backend,
-            dtype: resultPayload.dtype,
-            load_ms: currentRun.modelInfo?.load_ms ?? null,
-            inference_ms: resultPayload.inference_ms ?? null,
-            total_analyze_ms: resultPayload.total_analyze_ms
-          },
-          result: {
-            raw_text: resultPayload.raw_text,
-            parsed_json: resultPayload.parsed_json
-          },
-          config
-        }
-      });
+    await sendSubmission(sharedConfig.apiEndpoint, submission);
 
-      await sendSubmission(sharedConfig.apiEndpoint, submission);
-      setStatus('Done and sent.', 'ok');
-    } catch (err) {
-      console.error(err);
-      setStatus(`Done, but send failed: ${err.message || err}`, 'err');
+    if (state.currentSource === 'default') {
+      state.hasCompletedDefaultRun = true;
     }
 
-    refreshButtons();
+    closeProgressModal();
+    setStatus('Done and sent.', 'ok');
+    refreshSourceControls();
   } catch (err) {
+    closeProgressModal();
+    console.error(err);
     setStatus(err.message || 'Could not analyze image.', 'err');
     refreshButtons();
   }
 });
 
+disableAllInputs();
+consentModal.showModal();
+
+acceptConsentBtn.addEventListener('click', (event) => {
+  event.preventDefault();
+  state.hasConsent = true;
+  consentModal.close();
+  refreshSourceControls();
+  setStatus('Consent accepted.', 'ok');
+});
+
+declineConsentBtn.addEventListener('click', (event) => {
+  event.preventDefault();
+  state.hasConsent = false;
+  disableAllInputs();
+  setStatus('Consent is required to use the benchmark.', 'err');
+});
+
 runner.init();
+refreshSourceControls();

@@ -174,6 +174,61 @@
     .preview canvas {
       pointer-events: none;
       display: none;
+    }
+
+
+    dialog {
+      border: 0;
+      border-radius: 16px;
+      padding: 0;
+      max-width: min(520px, calc(100vw - 24px));
+      width: 100%;
+      box-shadow: 0 12px 40px rgba(0,0,0,0.18);
+    }
+
+    dialog::backdrop {
+      background: rgba(0,0,0,0.35);
+    }
+
+    .modal-box {
+      background: var(--card);
+      padding: 18px;
+    }
+
+    .modal-box p {
+      margin: 0 0 10px 0;
+      color: var(--muted);
+      line-height: 1.5;
+    }
+
+    .modal-actions {
+      display: flex;
+      gap: 10px;
+      justify-content: flex-end;
+      margin-top: 14px;
+    }
+
+    .modal-progress {
+      min-height: 180px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 14px;
+      text-align: center;
+    }
+
+    .spinner {
+      width: 46px;
+      height: 46px;
+      border-radius: 999px;
+      border: 4px solid #ddd;
+      border-top-color: #111;
+      animation: spin 1s linear infinite;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
     }    
   </style>
 </head>
@@ -223,6 +278,29 @@
       <pre id="output">{}</pre>
     </div>
   </div>
+
+  <dialog id="consentModal">
+    <form method="dialog" class="modal-box">
+      <h2>Consentimento</h2>
+      <p>
+        Este benchmark coleta dados técnicos do navegador e do dispositivo, além dos resultados de desempenho da análise.
+      </p>
+      <p>
+        Os dados serão enviados para fins de pesquisa e desenvolvimento. Sem consentimento, o benchmark não pode ser utilizado.
+      </p>
+      <div class="modal-actions">
+        <button id="declineConsentBtn" class="secondary" value="decline" type="submit">Não aceito</button>
+        <button id="acceptConsentBtn" value="accept" type="submit">Aceito</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="progressModal">
+    <div class="modal-box modal-progress">
+      <div class="spinner"></div>
+      <div id="progressModalText" class="muted">Processando...</div>
+    </div>
+  </dialog>  
 
   <script type="module" src="../../src/demos/efficientdet-lite0-benchmark/app.js"></script>
 </body>
