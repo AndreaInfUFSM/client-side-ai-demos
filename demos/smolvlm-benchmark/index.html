@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta
+    name="viewport"
+    content="width=device-width, initial-scale=1, viewport-fit=cover"
+  />
+  <title>SmolVLM Mobile Lab</title>
+  <style>
+    * { box-sizing: border-box; }
+
+    :root {
+      --bg: #f5f5f2;
+      --card: #ffffff;
+      --text: #171717;
+      --muted: #666;
+      --line: #ddd;
+      --soft: #efefe9;
+      --radius: 16px;
+    }
+
+    body {
+      margin: 0;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: var(--bg);
+      color: var(--text);
+    }
+
+    .wrap {
+      max-width: 760px;
+      margin: 0 auto;
+      padding: 16px;
+    }
+
+    .card {
+      background: var(--card);
+      border-radius: var(--radius);
+      padding: 16px;
+      margin-bottom: 14px;
+      box-shadow: 0 2px 14px rgba(0,0,0,0.05);
+    }
+
+    h1, h2 {
+      margin: 0 0 10px 0;
+      line-height: 1.15;
+    }
+
+    h1 { font-size: 1.35rem; }
+    h2 { font-size: 1rem; }
+
+    .muted {
+      color: var(--muted);
+    }
+
+    .preview {
+      width: 100%;
+      aspect-ratio: 1 / 1;
+      border: 2px dashed var(--line);
+      border-radius: 14px;
+      background: #fafaf8;
+      display: grid;
+      place-items: center;
+      overflow: hidden;
+      margin-bottom: 12px;
+    }
+
+    .preview img {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      display: none;
+      background: #fff;
+    }
+
+    .placeholder {
+      text-align: center;
+      color: var(--muted);
+      padding: 20px;
+    }
+
+    .controls {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+
+    button, input[type="file"] {
+      font: inherit;
+    }
+
+    button {
+      border: 0;
+      border-radius: 12px;
+      padding: 11px 14px;
+      background: #111;
+      color: white;
+      cursor: pointer;
+    }
+
+    button.secondary {
+      background: var(--soft);
+      color: var(--text);
+    }
+
+    button:disabled {
+      opacity: 0.55;
+      cursor: not-allowed;
+    }
+
+    textarea {
+      width: 100%;
+      min-height: 330px;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 12px;
+      resize: vertical;
+      font: 13px/1.45 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      background: #fbfbfa;
+      color: #111;
+    }
+
+    .status-line {
+      display: flex;
+      gap: 8px;
+      align-items: flex-start;
+      margin-top: 10px;
+      min-height: 1.2em;
+      font-size: 0.95rem;
+    }
+
+    .dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 999px;
+      background: #999;
+      margin-top: 0.33rem;
+      flex: 0 0 auto;
+    }
+
+    .dot.ok { background: #1c9b4a; }
+    .dot.busy { background: #d38c00; }
+    .dot.err { background: #c83737; }
+
+    pre {
+      margin: 0;
+      white-space: pre-wrap;
+      word-break: break-word;
+      background: #101217;
+      color: #ecedf0;
+      border-radius: 12px;
+      padding: 12px;
+      overflow: auto;
+      font: 13px/1.45 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      min-height: 140px;
+    }
+
+    .tiny {
+      font-size: 0.88rem;
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="card">
+      <h1>SmolVLM Mobile Lab</h1>
+      <div class="muted tiny">
+        Minimal browser app for trying SmolVLM configs on mobile.
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Image</h2>
+      <div class="preview">
+        <img id="preview" alt="Preview image" />
+        <div id="placeholder" class="placeholder">No image selected</div>
+      </div>
+
+      <div class="controls">
+        <input id="imageInput" type="file" accept="image/*" />
+        <button id="useDefaultBtn" class="secondary" type="button">Use default image</button>
+        <button id="loadBtn" type="button">Load model</button>
+        <button id="analyzeBtn" type="button" disabled>Analyze</button>
+      </div>
+
+      <div class="status-line">
+        <div id="statusDot" class="dot"></div>
+        <div id="statusText" class="muted">Starting worker...</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Config JSON</h2>
+      <textarea id="configInput">
+{
+  "model_id": "HuggingFaceTB/SmolVLM-500M-Instruct",
+  "processor_id": "HuggingFaceTB/SmolVLM-500M-Instruct",
+  "load": {
+    "prefer_webgpu": true,
+    "wasm_fallback": true,
+    "webgpu_dtype": "fp16",
+    "wasm_dtype": "q4"
+  },
+  "processor": {
+    "do_image_splitting": false
+  },
+  "generation": {
+    "max_new_tokens": 48,
+    "do_sample": false,
+    "repetition_penalty": 1.1
+  },
+  "prompt": "Analyze the image and return only valid JSON with keys product_type, visible_materials, colors, style, short_description."
+}
+      </textarea>
+    </div>
+
+    <div class="card">
+      <h2>Structured output</h2>
+      <pre id="output">{}</pre>
+    </div>
+  </div>
+
+  <script type="module" src="../../src/demos/smolvlm-benchmark/app.js"></script>
+</body>
+</html>
