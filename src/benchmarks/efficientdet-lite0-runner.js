@@ -1,4 +1,4 @@
-export function createSmolVlmRunner({ workerUrl, onStatus = () => {}, onWorkerReady = () => {}, onModelReady = () => {}, onWorkerError = () => {} }) {
+export function createEfficientDetLite0Runner({ workerUrl, onStatus = () => {}, onWorkerReady = () => {}, onModelReady = () => {}, onWorkerError = () => {} }) {
   let worker = null;
   let workerReady = false;
   let modelReady = false;
@@ -8,8 +8,8 @@ export function createSmolVlmRunner({ workerUrl, onStatus = () => {}, onWorkerRe
   function init() {
     if (worker) return;
 
-
-    worker = new Worker(workerUrl, { type: 'module' });
+    worker = new Worker(workerUrl);
+    // worker = new Worker(workerUrl, { type: 'module' });
 
     worker.addEventListener('message', (event) => {
       const msg = event.data || {};
