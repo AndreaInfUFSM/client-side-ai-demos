@@ -223,6 +223,7 @@ async function loadDefaultImage() {
   const blob = await res.blob();
   const dataUrl = await blobToDataUrl(blob);
   currentImageDataUrl = dataUrl;
+  state.currentSource = 'default';
   showImage(dataUrl);
   refreshButtons();
 }
@@ -362,10 +363,22 @@ analyzeBtn.addEventListener('click', async () => {
 disableAllInputs();
 consentModal.showModal();
 
-acceptConsentBtn.addEventListener('click', (event) => {
+acceptConsentBtn.addEventListener('click', async (event) => {
   event.preventDefault();
   state.hasConsent = true;
   consentModal.close();
+
+  try {
+    openProgressModal('Loading default image...');
+    await loadDefaultImage();
+    state.currentSource = 'default';
+    closeProgressModal();
+    setStatus('Default image loaded.', 'ok');
+  } catch (err) {
+    closeProgressModal();
+    setStatus(err.message || 'Could not load default image.', 'err');
+  }
+  
   refreshSourceControls();
   setStatus('Consent accepted.', 'ok');
 });
